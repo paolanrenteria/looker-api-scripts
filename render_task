@@ -1,0 +1,44 @@
+#!/usr/bin/env ruby
+require 'looker-sdk'
+require 'json'
+require 'csv'
+require 'zip'
+
+
+sdk = LookerSDK::Client.new(
+  :client_id => ENV['LOOKER_ID'],
+  :client_secret => ENV['LOOKER_SECRET'],
+  :api_endpoint => "https://learn.looker.com:19999/api/3.0"
+)
+
+#Checks connection, Response 200 = success
+puts sdk.alive
+
+#Create query render task as PNG, set width and height (can change to JPG)
+something = sdk.create_query_render_task(229602, "png", {}, {:query => {:width => 1000, :height => 1000}})
+#Grab the render task ID
+s_id = something[:id]
+#Show the render task ID
+puts s_id
+
+#Check the status of render job
+puts sdk.render_task(s_id)[:status]
+
+#Checking that the render job status is success - if we try to write to file while 
+#render job is still 'rendering', we will get an empty/broken PNG file
+tries = 0
+until sdk.render_task(s_id)[:status] == 'success' or tries == 100 do
+  results = sdk.render_task_results(s_id)
+  tries += 1
+end
+
+#Checks results class, we want string. And checks length, we don't want 0
+puts 'class='+results.class.to_s
+puts 'length='+results.length.to_s
+
+#Assuming the render task has completed, the length of 'results' should be greater than 0.
+#If length is not greater than 0, the render task didn't complete so we won't write to file.
+if results.length > 0
+  File.open('apirender01.png', 'w') { |file| file.write(results) }
+  puts 'Render Complete!'
+end
